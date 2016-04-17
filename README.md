@@ -1,2 +1,1 @@
-# KerasLSTM
-LSTMs
+# SmilNN
