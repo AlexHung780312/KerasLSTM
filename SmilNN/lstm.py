@@ -137,164 +137,164 @@ class LSTM_base(Recurrent):
             del self.initial_weights
 
 
-def reset_states(self):
-    assert self.stateful, 'Layer must be stateful.'
-    input_shape = self.input_spec[0].shape
-    if not input_shape[0]:
-        raise Exception('If a RNN is stateful, a complete ' +
-                        'input_shape must be provided (including batch size).')
-    if hasattr(self, 'states'):
-        K.set_value(self.states[0],
-                    np.zeros((input_shape[0], self.output_dim)))
-        K.set_value(self.states[1],
-                    np.zeros((input_shape[0], self.output_dim)))
-    else:
-        self.states = [K.zeros((input_shape[0], self.output_dim)),
-                       K.zeros((input_shape[0], self.output_dim))]
-
-
-def preprocess_input(self, x):
-    if self.consume_less == 'cpu':
-        if 0 < self.dropout_W < 1:
-            dropout = self.dropout_W
+    def reset_states(self):
+        assert self.stateful, 'Layer must be stateful.'
+        input_shape = self.input_spec[0].shape
+        if not input_shape[0]:
+            raise Exception('If a RNN is stateful, a complete ' +
+                            'input_shape must be provided (including batch size).')
+        if hasattr(self, 'states'):
+            K.set_value(self.states[0],
+                        np.zeros((input_shape[0], self.output_dim)))
+            K.set_value(self.states[1],
+                        np.zeros((input_shape[0], self.output_dim)))
         else:
-            dropout = 0
-        input_shape = self.input_spec[0].shape
-        input_dim = input_shape[2]
-        timesteps = input_shape[1]
+            self.states = [K.zeros((input_shape[0], self.output_dim)),
+                           K.zeros((input_shape[0], self.output_dim))]
 
-        x_c = time_distributed_dense(x, self.W_g, self.b_g, dropout,
-                                     input_dim, self.output_dim, timesteps)
-        result = K.concatenate([x_c], axis=2)
-        if self.with_i:
-            x_i = time_distributed_dense(x, self.W_i, self.b_i, dropout,
+
+    def preprocess_input(self, x):
+        if self.consume_less == 'cpu':
+            if 0 < self.dropout_W < 1:
+                dropout = self.dropout_W
+            else:
+                dropout = 0
+            input_shape = self.input_spec[0].shape
+            input_dim = input_shape[2]
+            timesteps = input_shape[1]
+
+            x_c = time_distributed_dense(x, self.W_g, self.b_g, dropout,
                                          input_dim, self.output_dim, timesteps)
-            result = K.concatenate([result, x_i], axis=2)
-        if self.with_f:
-            x_f = time_distributed_dense(x, self.W_f, self.b_f, dropout,
-                                         input_dim, self.output_dim, timesteps)
-            result = K.concatenate([result, x_f], axis=2)
-        if self.with_o:
-            x_o = time_distributed_dense(x, self.W_o, self.b_o, dropout,
-                                         input_dim, self.output_dim, timesteps)
-            result = K.concatenate([result, x_o], axis=2)
-        return result
-    else:
-        return x
+            result = K.concatenate([x_c], axis=2)
+            if self.with_i:
+                x_i = time_distributed_dense(x, self.W_i, self.b_i, dropout,
+                                             input_dim, self.output_dim, timesteps)
+                result = K.concatenate([result, x_i], axis=2)
+            if self.with_f:
+                x_f = time_distributed_dense(x, self.W_f, self.b_f, dropout,
+                                             input_dim, self.output_dim, timesteps)
+                result = K.concatenate([result, x_f], axis=2)
+            if self.with_o:
+                x_o = time_distributed_dense(x, self.W_o, self.b_o, dropout,
+                                             input_dim, self.output_dim, timesteps)
+                result = K.concatenate([result, x_o], axis=2)
+            return result
+        else:
+            return x
 
 
-def step(self, x, states):
-    h_tm1 = states[0]
-    c_tm1 = states[1]
-    B_W = states[2]
+    def step(self, x, states):
+        h_tm1 = states[0]
+        c_tm1 = states[1]
+        B_W = states[2]
 
-    if self.with_recurrent_link:
-        B_U = states[3]
+        if self.with_recurrent_link:
+            B_U = states[3]
+            if self.with_i:
+                U_i = K.repeat_elements(self.U_i * self.U_mask, self.rep, axis=0)
+            if self.with_f:
+                U_f = K.repeat_elements(self.U_f * self.U_mask, self.rep, axis=0)
+            if self.with_o:
+                U_o =K.repeat_elements(self.U_o * self.U_mask, self.rep, axis=0)
         if self.with_i:
-            U_i = K.repeat_elements(self.U_i * self.U_mask, self.rep, axis=0)
+            W_i = K.repeat_elements(self.W_i, self.rep, axis=0)
+            b_i = K.repeat_elements(self.b_i, self.rep, axis=0)
         if self.with_f:
-            U_f = K.repeat_elements(self.U_f * self.U_mask, self.rep, axis=0)
+            W_f = K.repeat_elements(self.W_f, self.rep, axis=0)
+            b_f = K.repeat_elements(self.b_f, self.rep, axis=0)
         if self.with_o:
-            U_o =K.repeat_elements(self.U_o * self.U_mask, self.rep, axis=0)
-    if self.with_i:
-        W_i = K.repeat_elements(self.W_i, self.rep, axis=0)
-        b_i = K.repeat_elements(self.b_i, self.rep, axis=0)
-    if self.with_f:
-        W_f = K.repeat_elements(self.W_f, self.rep, axis=0)
-        b_f = K.repeat_elements(self.b_f, self.rep, axis=0)
-    if self.with_o:
-        W_o = K.repeat_elements(self.W_o, self.rep, axis=0)
-        b_o = K.repeat_elements(self.b_o, self.rep, axis=0)
+            W_o = K.repeat_elements(self.W_o, self.rep, axis=0)
+            b_o = K.repeat_elements(self.b_o, self.rep, axis=0)
 
-    if self.consume_less == 'cpu':
-        x_g = x[:, :self.output_dim]
-        last = self.output_dim
-        if self.with_i:
-            x_i = K.repeat_elements(x[:, last: last + self.num_blocks], self.rep, axis=0)
-            last = last + self.num_blocks
-        if self.with_f:
-            x_f = K.repeat_elements(x[:, last: last + self.output_dim], self.rep, axis=0)
-            last = last + self.num_blocks
-        if self.with_o:
-            x_o = K.repeat_elements(x[:, last: last + self.output_dim], self.rep, axis=0)
-    else:
-        x_g = K.dot(x * B_W[0], self.W_g) + self.b_g
-        last = 0
-        if self.with_i:
-            x_i = K.dot(x * B_W[last + 1], W_i) + b_i
-            last += 1
-        if self.with_f:
-            x_f = K.dot(x * B_W[last + 1], W_f) + b_f
-            last += 1
-        if self.with_o:
-            x_o = K.dot(x * B_W[last + 1], W_o) + b_o
-            last += 1
+        if self.consume_less == 'cpu':
+            x_g = x[:, :self.output_dim]
+            last = self.output_dim
+            if self.with_i:
+                x_i = K.repeat_elements(x[:, last: last + self.num_blocks], self.rep, axis=0)
+                last = last + self.num_blocks
+            if self.with_f:
+                x_f = K.repeat_elements(x[:, last: last + self.output_dim], self.rep, axis=0)
+                last = last + self.num_blocks
+            if self.with_o:
+                x_o = K.repeat_elements(x[:, last: last + self.output_dim], self.rep, axis=0)
+        else:
+            x_g = K.dot(x * B_W[0], self.W_g) + self.b_g
+            last = 0
+            if self.with_i:
+                x_i = K.dot(x * B_W[last + 1], W_i) + b_i
+                last += 1
+            if self.with_f:
+                x_f = K.dot(x * B_W[last + 1], W_f) + b_f
+                last += 1
+            if self.with_o:
+                x_o = K.dot(x * B_W[last + 1], W_o) + b_o
+                last += 1
 
-    if self.with_recurrent_link:
-        u_g = self.activation(K.dot(h_tm1 * B_U[0], self.U_g * self.U_g_mask))
-        last = 0
-        if self.with_i:
-            u_i = K.dot(h_tm1 * B_U[last + 1], U_i)
-            last += 1
-        if self.with_f:
-            u_f = K.dot(h_tm1 * B_U[last + 1], U_f)
-            last += 1
-        if self.with_o:
-            u_o = K.dot(h_tm1 * B_U[last + 1], U_o)
-            last += 1
-        g = self.activation(x_g + u_g)
-        gi = self.inner_activation(x_i + u_i) * g if self.with_i else g
-        c = self.inner_activation(x_f + u_f) * c_tm1 + gi if self.with_f else c_tm1 + gi
-        h = self.inner_activation(x_o + u_o) * self.activation(c) if self.with_o else self.activation(c)
-    else:
-        g = self.activation(x_g)
-        gi = self.inner_activation(x_i) * g if self.with_i else g
-        c = self.inner_activation(x_f) * c_tm1 + gi if self.with_f else c_tm1 + gi
-        h = self.inner_activation(x_o) * self.activation(c) if self.with_o else self.activation(c)
-    return h, [h, c]
+        if self.with_recurrent_link:
+            u_g = self.activation(K.dot(h_tm1 * B_U[0], self.U_g * self.U_g_mask))
+            last = 0
+            if self.with_i:
+                u_i = K.dot(h_tm1 * B_U[last + 1], U_i)
+                last += 1
+            if self.with_f:
+                u_f = K.dot(h_tm1 * B_U[last + 1], U_f)
+                last += 1
+            if self.with_o:
+                u_o = K.dot(h_tm1 * B_U[last + 1], U_o)
+                last += 1
+            g = self.activation(x_g + u_g)
+            gi = self.inner_activation(x_i + u_i) * g if self.with_i else g
+            c = self.inner_activation(x_f + u_f) * c_tm1 + gi if self.with_f else c_tm1 + gi
+            h = self.inner_activation(x_o + u_o) * self.activation(c) if self.with_o else self.activation(c)
+        else:
+            g = self.activation(x_g)
+            gi = self.inner_activation(x_i) * g if self.with_i else g
+            c = self.inner_activation(x_f) * c_tm1 + gi if self.with_f else c_tm1 + gi
+            h = self.inner_activation(x_o) * self.activation(c) if self.with_o else self.activation(c)
+        return h, [h, c]
 
 
-def get_constants(self, x):
-    constants = []
+    def get_constants(self, x):
+        constants = []
 
-    if 0 < self.dropout_W < 1:
-        input_shape = self.input_spec[0].shape
-        input_dim = input_shape[-1]
-        ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
-        ones = K.concatenate([ones] * input_dim, 1)
-        B_W = [K.in_train_phase(K.dropout(ones, self.dropout_W), ones) for _ in range(4)]
-        constants.append(B_W)
-    else:
-        constants.append([K.cast_to_floatx(1.) for _ in range(4)])
+        if 0 < self.dropout_W < 1:
+            input_shape = self.input_spec[0].shape
+            input_dim = input_shape[-1]
+            ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
+            ones = K.concatenate([ones] * input_dim, 1)
+            B_W = [K.in_train_phase(K.dropout(ones, self.dropout_W), ones) for _ in range(4)]
+            constants.append(B_W)
+        else:
+            constants.append([K.cast_to_floatx(1.) for _ in range(4)])
 
-    if 0 < self.dropout_U < 1 and self.with_recurrent_link:
-        ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
-        ones = K.concatenate([ones] * self.output_dim, 1)
-        B_U = [K.in_train_phase(K.dropout(ones, self.dropout_U), ones) for _ in range(4)]
-        constants.append(B_U)
-    else:
-        constants.append([K.cast_to_floatx(1.) for _ in range(4)])
+        if 0 < self.dropout_U < 1 and self.with_recurrent_link:
+            ones = K.ones_like(K.reshape(x[:, 0, 0], (-1, 1)))
+            ones = K.concatenate([ones] * self.output_dim, 1)
+            B_U = [K.in_train_phase(K.dropout(ones, self.dropout_U), ones) for _ in range(4)]
+            constants.append(B_U)
+        else:
+            constants.append([K.cast_to_floatx(1.) for _ in range(4)])
 
-    return constants
+        return constants
 
 
-def get_config(self):
-    config = {"output_dim": self.output_dim,
-              "num_blocks": self.num_blocks,
-              "with_recurrent_link": self.with_recurrent_link,
-              "connection": self.connection,
-              "with_i": self.with_i,
-              "with_f": self.with_f,
-              "with_o": self.with_o,
-              "init": self.init.__name__,
-              "inner_init": self.inner_init.__name__,
-              "forget_bias_init": self.forget_bias_init.__name__,
-              "activation": self.activation.__name__,
-              "inner_activation": self.inner_activation.__name__,
-              "W_regularizer": self.W_regularizer.get_config() if self.W_regularizer else None,
-              "U_regularizer": self.U_regularizer.get_config() if self.U_regularizer else None,
-              "b_regularizer": self.b_regularizer.get_config() if self.b_regularizer else None,
-              "dropout_W": self.dropout_W,
-              "dropout_U": self.dropout_U}
-    base_config = super(LSTM_base, self).get_config()
-    return dict(list(base_config.items()) + list(config.items()))
+    def get_config(self):
+        config = {"output_dim": self.output_dim,
+                  "num_blocks": self.num_blocks,
+                  "with_recurrent_link": self.with_recurrent_link,
+                  "connection": self.connection,
+                  "with_i": self.with_i,
+                  "with_f": self.with_f,
+                  "with_o": self.with_o,
+                  "init": self.init.__name__,
+                  "inner_init": self.inner_init.__name__,
+                  "forget_bias_init": self.forget_bias_init.__name__,
+                  "activation": self.activation.__name__,
+                  "inner_activation": self.inner_activation.__name__,
+                  "W_regularizer": self.W_regularizer.get_config() if self.W_regularizer else None,
+                  "U_regularizer": self.U_regularizer.get_config() if self.U_regularizer else None,
+                  "b_regularizer": self.b_regularizer.get_config() if self.b_regularizer else None,
+                  "dropout_W": self.dropout_W,
+                  "dropout_U": self.dropout_U}
+        base_config = super(LSTM_base, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
