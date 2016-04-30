@@ -81,10 +81,10 @@ for row, (tri, tag) in enumerate(test_tri):
 
 # http://research.microsoft.com/apps/pubs/default.aspx?id=256230
 model = Sequential()
-model.add(Convolution1D(2, 3, activation='tanh', W_regularizer=l1l2(l1=0.01, l2=0.01), b_regularizer=l1l2(l1=0.01, l2=0.01), init='uniform', border_mode='same', input_shape=(max_len,len(dictionary))))
+model.add(Convolution1D(1000, 3, activation='tanh', W_regularizer=l1l2(l1=0.01, l2=0.01), b_regularizer=l1l2(l1=0.01, l2=0.01), init='uniform', border_mode='same', input_shape=(max_len,len(dictionary))))
 model.add(MaxPooling1D(pool_length=max_len, border_mode='valid'))
 model.add(Flatten())
-model.add(Dense(2, activation='tanh', W_regularizer=l1l2(l1=0.01, l2=0.01), b_regularizer=l1l2(l1=0.01, l2=0.01)))
+model.add(Dense(300, activation='tanh', W_regularizer=l1l2(l1=0.01, l2=0.01), b_regularizer=l1l2(l1=0.01, l2=0.01)))
 model.add(CosSim(2, activation='linear', bias=False, W_regularizer=l1l2(l1=0.01, l2=0.01)))
 model.add(Activation(activation='softmax'))
 model.compile(optimizer='Adagrad',
