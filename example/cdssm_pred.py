@@ -87,8 +87,10 @@ model.add(Flatten())
 model.add(Dense(300, activation='tanh', W_regularizer=l1l2(l1=0.01, l2=0.01), b_regularizer=l1l2(l1=0.01, l2=0.01)))
 model.add(CosSim(2, activation='linear', bias=False, W_regularizer=l1l2(l1=0.01, l2=0.01)))
 model.add(Activation(activation='softmax'))
+def PredictiveLoss(y_true, y_pred):
+    return -K.mean(K.log(y_true * y_pred), axis=-1)
 model.compile(optimizer='Adagrad',
-      loss='categorical_crossentropy',
+      loss=PredictiveLoss,
       metrics=['accuracy'])
 model.fit(X_train, y_train, validation_data=(X_test, y_test), batch_size=2, nb_epoch=30)
 loss, acc = model.evaluate(X_test, y_test)
