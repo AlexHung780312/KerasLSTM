@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-
+import keras.layers.recurrent
 from keras.layers.recurrent import *
-
 
 class LSTM_base(Recurrent):
     '''Long Short-Term Memory unit - Hochreiter 1997.
